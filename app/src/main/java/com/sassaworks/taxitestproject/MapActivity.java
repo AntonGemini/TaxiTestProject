@@ -8,22 +8,24 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Build;
+import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
+import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
+import android.view.View;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationResult;
-import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -35,7 +37,13 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.sassaworks.taxitestproject.broadcast.TrackReceiver;
+import com.sassaworks.taxitestproject.database.AppDatabase;
+import com.sassaworks.taxitestproject.database.AppExecutor;
+import com.sassaworks.taxitestproject.database.LocationRoute;
 import com.sassaworks.taxitestproject.service.LocationBackgroundService;
+
+import java.util.Date;
+import java.util.concurrent.Executors;
 
 public class MapActivity extends FragmentActivity implements OnMapReadyCallback {
 
@@ -48,17 +56,43 @@ public class MapActivity extends FragmentActivity implements OnMapReadyCallback 
     private Location mLastLocation;
     private LocationRequest mLocationRequest;
     private LocationCallback mLocationCallback;
-
+    private AppDatabase mDb;
+    private boolean trackingMode = false;
+    private int mRouteCount = 0;
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_map);
+        Context context = this;
+        mDb = AppDatabase.getInstance(context);
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         final SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
 
+        FloatingActionButton fab = findViewById(R.id.startTracking);
+        fab.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+
+                if (trackingMode == false) {
+                    SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
+                    mRouteCount = sharedPreferences.getInt(getString(R.string.route_number), 1) + 1;
+                    sharedPreferences.edit().putInt(getString(R.string.route_number), mRouteCount).apply();
+                    fab.setImageResource(R.drawable.ic_stop);
+                    trackingMode = true;
+                }
+                else {
+                    fab.setImageResource(R.drawable.ic_play);
+                    trackingMode = false;
+                }
+                //sharedPreferences.edit().
+            }
+        });
+
+
+        //Register broadcast for drawing current location
         LocalBroadcastManager.getInstance(this).registerReceiver(new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -72,28 +106,12 @@ public class MapActivity extends FragmentActivity implements OnMapReadyCallback 
                             .title("My location")
                             .position(new LatLng(latitude,
                                     longitude)));
+                    if (trackingMode) {
+                        saveToDatabase(latitude,longitude);
+                    }
             }
         },new IntentFilter(LocationBackgroundService.ACTION_LOCATION_BROADCAST));
 
-//        mLocationCallback = new LocationCallback() {
-//            @Override
-//            public void onLocationResult(LocationResult locationResult) {
-//                if (locationResult == null) {
-//                    return;
-//                }
-//                for (Location location : locationResult.getLocations()) {
-//                    mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
-//                            new LatLng(location.getLatitude(),
-//                                    location.getLongitude()),15));
-//                    mCurrentMarker.remove();
-//                    mCurrentMarker = mMap.addMarker(new MarkerOptions()
-//                            .title("My location")
-//                            .position(new LatLng(location.getLatitude(),
-//                                    location.getLongitude())));
-//                }
-//
-//            }
-//        };
 //
 //        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         mapFragment.getMapAsync(this);
@@ -199,7 +217,7 @@ public class MapActivity extends FragmentActivity implements OnMapReadyCallback 
                                     //mMap.moveCamera(CameraUpdateFactory.newLatLngZoom());
                                 }
                                 mMap.getUiSettings().setMyLocationButtonEnabled(true);
-                                createLocationRequest();
+                                //createLocationRequest();
 
                             }
                         });
@@ -212,31 +230,13 @@ public class MapActivity extends FragmentActivity implements OnMapReadyCallback 
     }
 
 
-    protected void createLocationRequest() {
-        mLocationRequest = new LocationRequest();
-        mLocationRequest.setInterval(20000);
-        mLocationRequest.setFastestInterval(15000);
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        startLocationUpdates();
-    }
-
-    private void startLocationUpdates() {
-
-        try {
-
-            Intent intent = new Intent(this,TrackReceiver.class);
-            PendingIntent pendingIntent = PendingIntent.getBroadcast(this,15,intent,PendingIntent.FLAG_UPDATE_CURRENT);
-            //mFusedLocationClient.requestLocationUpdates(mLocationRequest,pendingIntent);
-//            mFusedLocationClient.requestLocationUpdates(mLocationRequest,
-//                    mLocationCallback,
-//                    null /* Looper */);
-
-        }
-        catch (SecurityException ex)
-        {
-
-        }
-
+    private void saveToDatabase(double latitude, double longitude)
+    {
+        String routeName = "Маршрут " + mRouteCount;
+        final LocationRoute route = new LocationRoute(routeName,latitude,longitude,new Date());
+        AppExecutor.getInstance().getDbExecutor().execute(() -> {
+                mDb.routeDao().insertRoute(route);
+        });
     }
 
 }

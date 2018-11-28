@@ -54,6 +54,9 @@ GoogleApiClient.OnConnectionFailedListener{
     @Override
     public void onCreate() {
         super.onCreate();
+
+
+        //Creating foreground service for saving coords when in background
         Notification notification =
                 null;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -76,6 +79,7 @@ GoogleApiClient.OnConnectionFailedListener{
 
             NotificationCompat.Builder builder = new NotificationCompat.Builder(this)
                     .setContentTitle(getString(R.string.app_name))
+                    .setSmallIcon(R.drawable.googleg_standard_color_18)
                     .setContentText("Taxi")
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     .setAutoCancel(true);
@@ -112,14 +116,6 @@ GoogleApiClient.OnConnectionFailedListener{
                     intent.putExtra(LON_DATA, location.getLongitude());
                     LocalBroadcastManager.getInstance(context).sendBroadcast(intent);
 
-//                    mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
-//                            new LatLng(location.getLatitude(),
-//                                    location.getLongitude()),15));
-//                    mCurrentMarker.remove();
-//                    mCurrentMarker = mMap.addMarker(new MarkerOptions()
-//                            .title("My location")
-//                            .position(new LatLng(location.getLatitude(),
-//                                    location.getLongitude())));
                 }
 
             }
@@ -145,7 +141,6 @@ GoogleApiClient.OnConnectionFailedListener{
 
             Intent intent = new Intent(this,TrackReceiver.class);
             PendingIntent pendingIntent = PendingIntent.getBroadcast(this,15,intent,PendingIntent.FLAG_UPDATE_CURRENT);
-            //mFusedLocationClient.requestLocationUpdates(mLocationRequest,pendingIntent);
             mFusedLocationClient.requestLocationUpdates(mLocationRequest,
                     mLocationCallback,
                     null /* Looper */);
