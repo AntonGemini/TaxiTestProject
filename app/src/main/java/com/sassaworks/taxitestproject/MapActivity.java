@@ -67,9 +67,11 @@ public class MapActivity extends FragmentActivity implements OnMapReadyCallback 
         setContentView(R.layout.activity_map);
         Context context = this;
         mDb = AppDatabase.getInstance(context);
+
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         final SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
+
 
         FloatingActionButton fab = findViewById(R.id.startTracking);
         fab.setOnClickListener(new View.OnClickListener() {
@@ -93,24 +95,24 @@ public class MapActivity extends FragmentActivity implements OnMapReadyCallback 
 
 
         //Register broadcast for drawing current location
-        LocalBroadcastManager.getInstance(this).registerReceiver(new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                double latitude = intent.getDoubleExtra(LocationBackgroundService.LAT_DATA,0);
-                double longitude = intent.getDoubleExtra(LocationBackgroundService.LON_DATA,0);
-                                    mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
-                            new LatLng(latitude,
-                                    longitude),15));
-                    if (mCurrentMarker != null) mCurrentMarker.remove();
-                    mCurrentMarker = mMap.addMarker(new MarkerOptions()
-                            .title("My location")
-                            .position(new LatLng(latitude,
-                                    longitude)));
-                    if (trackingMode) {
-                        saveToDatabase(latitude,longitude);
-                    }
-            }
-        },new IntentFilter(LocationBackgroundService.ACTION_LOCATION_BROADCAST));
+//        LocalBroadcastManager.getInstance(this).registerReceiver(new BroadcastReceiver() {
+//            @Override
+//            public void onReceive(Context context, Intent intent) {
+//                double latitude = intent.getDoubleExtra(LocationBackgroundService.LAT_DATA,0);
+//                double longitude = intent.getDoubleExtra(LocationBackgroundService.LON_DATA,0);
+//                                    mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
+//                            new LatLng(latitude,
+//                                    longitude),15));
+//                    if (mCurrentMarker != null) mCurrentMarker.remove();
+//                    mCurrentMarker = mMap.addMarker(new MarkerOptions()
+//                            .title("My location")
+//                            .position(new LatLng(latitude,
+//                                    longitude)));
+//                    if (trackingMode) {
+//                        saveToDatabase(latitude,longitude);
+//                    }
+//            }
+//        },new IntentFilter(LocationBackgroundService.ACTION_LOCATION_BROADCAST));
 
 //
 //        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
