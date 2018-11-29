@@ -1,11 +1,13 @@
 package com.sassaworks.taxitestproject;
 
+import android.arch.lifecycle.LiveData;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Build;
@@ -17,6 +19,8 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.content.LocalBroadcastManager;
+import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.helper.ItemTouchHelper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -28,15 +32,20 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.MapsInitializer;
 import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.model.JointType;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.android.gms.maps.model.RoundCap;
 import com.sassaworks.taxitestproject.database.AppDatabase;
 import com.sassaworks.taxitestproject.database.AppExecutor;
 import com.sassaworks.taxitestproject.database.LocationRoute;
 import com.sassaworks.taxitestproject.service.LocationBackgroundService;
 
 import java.util.Date;
+import java.util.List;
 
 
 /**
@@ -62,8 +71,9 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     private LocationRequest mLocationRequest;
     private LocationCallback mLocationCallback;
     private AppDatabase mDb;
-    private boolean trackingMode = false;
     private int mRouteCount = 0;
+    private Date mRouteDate;
+    private Polyline mPolyline;
 
     // TODO: Rename and change types of parameters
     private String mParam1;
@@ -118,18 +128,29 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
             e.printStackTrace();
         }
 
+
+
+        mDb = AppDatabase.getInstance(getContext());
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getContext());
         FloatingActionButton fab = v.findViewById(R.id.startTracking);
+        if (!sharedPreferences.getBoolean(getString(R.string.saving_state), false)) {
+            fab.setImageResource(R.drawable.ic_play);
+        } else {
+            fab.setImageResource(R.drawable.ic_stop);
+        }
         fab.setOnClickListener((view) -> {
-                if (trackingMode == false) {
-                    SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getContext());
+                if (!sharedPreferences.getBoolean(getString(R.string.saving_state),false)) {
+                    mRouteDate = new Date();
                     mRouteCount = sharedPreferences.getInt(getString(R.string.route_number), 1) + 1;
                     sharedPreferences.edit().putInt(getString(R.string.route_number), mRouteCount).apply();
+                    sharedPreferences.edit().putBoolean(getString(R.string.saving_state),true).apply();
+                    sharedPreferences.edit().putLong(getString(R.string.saving_date),mRouteDate.getTime()).apply();
                     fab.setImageResource(R.drawable.ic_stop);
-                    trackingMode = true;
+
                 }
                 else {
+                    sharedPreferences.edit().putBoolean(getString(R.string.saving_state),false).apply();
                     fab.setImageResource(R.drawable.ic_play);
-                    trackingMode = false;
                 }
         });
 
@@ -146,9 +167,9 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                         .title("My location")
                         .position(new LatLng(latitude,
                                 longitude)));
-                if (trackingMode) {
-                    saveToDatabase(latitude,longitude);
-                }
+//                if (trackingMode) {
+//                    saveToDatabase(latitude,longitude);
+//                }
             }
         },new IntentFilter(LocationBackgroundService.ACTION_LOCATION_BROADCAST));
 
@@ -185,7 +206,28 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     public void onMapReady(GoogleMap googleMap) {
         mGoogleMap = googleMap;
         mListener.onFragmentInteraction();
+        if (mParam1.equals("route"))
+        {
+            LiveData<List<LocationRoute>> routePoints = mDb.routeDao().loadRouteByName(mParam2);
+            routePoints.observe(this, lr ->{
+                drawSelectedRoute(lr);
+            });
+        }
+    }
 
+    void drawSelectedRoute(List<LocationRoute> lr)
+    {
+        PolylineOptions polyOptions = new PolylineOptions();
+        polyOptions.geodesic(true).color(Color.RED).width(5);
+        polyOptions.startCap(new RoundCap());
+        polyOptions.endCap(new RoundCap());
+
+        for (LocationRoute item : lr)
+        {
+            LatLng latLng = new LatLng(item.getLatitude(), item.getLongitude());
+            polyOptions.add(latLng);
+        }
+        mGoogleMap.addPolyline(polyOptions);
     }
 
     /**
@@ -206,7 +248,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     private void saveToDatabase(double latitude, double longitude)
     {
         String routeName = "Маршрут " + mRouteCount;
-        final LocationRoute route = new LocationRoute(routeName,latitude,longitude,new Date());
+        final LocationRoute route = new LocationRoute(routeName,latitude,longitude,mRouteDate);
         AppExecutor.getInstance().getDbExecutor().execute(() -> {
             mDb.routeDao().insertRoute(route);
         });

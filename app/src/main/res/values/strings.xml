@@ -3,6 +3,9 @@
     <string name="title_activity_map">Map</string>
 
     <string name="route_number">Номер маршрута</string>
+    <string name="saving_state">Состояние сохранения</string>
+    <string name="saving_date">Дата сохранения</string>
+
     <string name="title_activity_main">MainActivity</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>

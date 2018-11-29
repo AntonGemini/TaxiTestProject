@@ -10,7 +10,7 @@ import java.util.Date;
 
 
 
-@Entity(tableName = "route")
+@Entity(tableName = "location")
 public class LocationRoute {
 
     @PrimaryKey(autoGenerate = true)

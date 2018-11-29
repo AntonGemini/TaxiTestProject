@@ -19,13 +19,18 @@ import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import com.sassaworks.taxitestproject.database.AppDatabase;
+import com.sassaworks.taxitestproject.database.AppExecutor;
+import com.sassaworks.taxitestproject.database.LocationRouteDao;
 import com.sassaworks.taxitestproject.service.LocationBackgroundService;
 
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener,
-        MapFragment.OnFragmentInteractionListener {
+        MapFragment.OnFragmentInteractionListener, LocationRouteFragment.OnListFragmentInteractionListener {
 
     private static final int PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
+
+    AppDatabase mDb;
 
     private boolean mLocationPermissionGranted;
 
@@ -35,15 +40,16 @@ public class MainActivity extends AppCompatActivity
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+        mDb = AppDatabase.getInstance(this);
 
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-            }
-        });
+//        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+//        fab.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View view) {
+//                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
+//                        .setAction("Action", null).show();
+//            }
+//        });
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
@@ -102,6 +108,8 @@ public class MainActivity extends AppCompatActivity
 
             // Handle the camera action
         } else if (id == R.id.nav_gallery) {
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.content_frame,LocationRouteFragment.newInstance(1)).commit();
 
         } else if (id == R.id.nav_slideshow) {
 
@@ -121,11 +129,13 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onFragmentInteraction() {
         getLocationPermission();
-        Intent intent = new Intent(this, LocationBackgroundService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent);
-        } else {
-            startService(intent);
+        if (!LocationBackgroundService.isServiceRun()) {
+            Intent intent = new Intent(this, LocationBackgroundService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent);
+            } else {
+                startService(intent);
+            }
         }
     }
 
@@ -160,9 +170,29 @@ public class MainActivity extends AppCompatActivity
                 }
             }
         }
-        Intent intent = new Intent(this, LocationBackgroundService.class);
-        startService(intent);
+        if (!LocationBackgroundService.isServiceRun()) {
+            Intent intent = new Intent(this, LocationBackgroundService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent);
+            } else {
+                startService(intent);
+            }
+        }
+        //Intent intent = new Intent(this, LocationBackgroundService.class);
+        //startService(intent);
     }
 
 
+    @Override
+    public void onListFragmentInteraction(LocationRouteDao.TempLocal item) {
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.content_frame,MapFragment.newInstance("route",item.getName())).commit();
+    }
+
+    @Override
+    public void onDeleteRouteListener(String route) {
+        AppExecutor.getInstance().getDbExecutor().execute(()->{
+            mDb.routeDao().deleteByName(route);
+        });
+    }
 }

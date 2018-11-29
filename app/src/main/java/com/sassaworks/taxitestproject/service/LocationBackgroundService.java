@@ -7,10 +7,12 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.location.Location;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.NotificationCompat;
@@ -29,6 +31,11 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.sassaworks.taxitestproject.R;
 import com.sassaworks.taxitestproject.broadcast.TrackReceiver;
+import com.sassaworks.taxitestproject.database.AppDatabase;
+import com.sassaworks.taxitestproject.database.AppExecutor;
+import com.sassaworks.taxitestproject.database.LocationRoute;
+
+import java.util.Date;
 
 public class LocationBackgroundService extends Service implements GoogleApiClient.ConnectionCallbacks,
 GoogleApiClient.OnConnectionFailedListener{
@@ -41,6 +48,12 @@ GoogleApiClient.OnConnectionFailedListener{
     public static final String LON_DATA = "longititude";
     public static final String LAT_DATA = "latitude";
 
+    private static LocationBackgroundService sInstance = null;
+
+    SharedPreferences sharedPreferences;
+    AppDatabase mDb;
+    public static final String ACTION_PING = LocationBackgroundService.class.getName() + ".PING";
+
     public LocationBackgroundService() {
     }
 
@@ -51,10 +64,14 @@ GoogleApiClient.OnConnectionFailedListener{
         return null;
     }
 
+    public static boolean isServiceRun() {
+        return sInstance != null;
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
-
+        sInstance = this;
 
         //Creating foreground service for saving coords when in background
         Notification notification =
@@ -87,7 +104,8 @@ GoogleApiClient.OnConnectionFailedListener{
             notification = builder.build();
 
         }
-
+        mDb = AppDatabase.getInstance(getApplicationContext());
+        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
         startForeground(1,notification);
     }
 
@@ -95,6 +113,7 @@ GoogleApiClient.OnConnectionFailedListener{
     public int onStartCommand(Intent intent, int flags, int startId) {
 
         final Context context = this;
+
 
         mLocationClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
@@ -116,6 +135,10 @@ GoogleApiClient.OnConnectionFailedListener{
                     intent.putExtra(LON_DATA, location.getLongitude());
                     LocalBroadcastManager.getInstance(context).sendBroadcast(intent);
 
+                    boolean savingState = sharedPreferences.getBoolean(getString(R.string.saving_state),false);
+                    if (savingState) {
+                        saveToDatabase(location.getLatitude(),location.getLongitude());
+                    }
                 }
 
             }
@@ -166,5 +189,22 @@ GoogleApiClient.OnConnectionFailedListener{
     @Override
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
 
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        sInstance = null;
+    }
+
+    private void saveToDatabase(double latitude, double longitude)
+    {
+        int routeNumber  = sharedPreferences.getInt(getString(R.string.route_number),0);
+        long longDate = sharedPreferences.getLong(getString(R.string.saving_date),0);
+        String routeName = "Маршрут " + routeNumber;
+        final LocationRoute route = new LocationRoute(routeName,latitude,longitude,new Date(longDate));
+        AppExecutor.getInstance().getDbExecutor().execute(() -> {
+            mDb.routeDao().insertRoute(route);
+        });
     }
 }
