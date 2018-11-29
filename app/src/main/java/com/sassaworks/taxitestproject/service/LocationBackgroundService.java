@@ -195,7 +195,10 @@ GoogleApiClient.OnConnectionFailedListener{
     public void onDestroy() {
         super.onDestroy();
         sInstance = null;
+        mFusedLocationClient.removeLocationUpdates(mLocationCallback);
+        sharedPreferences.edit().putBoolean(getString(R.string.saving_state),false).apply();
     }
+
 
     private void saveToDatabase(double latitude, double longitude)
     {

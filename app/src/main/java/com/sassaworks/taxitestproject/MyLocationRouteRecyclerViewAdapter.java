@@ -10,6 +10,8 @@ import com.sassaworks.taxitestproject.LocationRouteFragment.OnListFragmentIntera
 import com.sassaworks.taxitestproject.database.LocationRoute;
 import com.sassaworks.taxitestproject.database.LocationRouteDao;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.List;
 
 public class MyLocationRouteRecyclerViewAdapter extends RecyclerView.Adapter<MyLocationRouteRecyclerViewAdapter.ViewHolder> {
@@ -31,9 +33,13 @@ public class MyLocationRouteRecyclerViewAdapter extends RecyclerView.Adapter<MyL
 
     @Override
     public void onBindViewHolder(final ViewHolder holder, int position) {
+
+
+        SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm");
+
         holder.mItem = mValues.get(position);
         holder.mIdView.setText(mValues.get(position).getName());
-        holder.mContentView.setText(String.valueOf(mValues.get(position).getCreated_at()));
+        holder.mContentView.setText(sdf.format(mValues.get(position).getCreated_at()));
         holder.mNumberView.setText(String.valueOf(mValues.get(position).getCnt()));
 
         holder.mView.setOnClickListener(new View.OnClickListener() {

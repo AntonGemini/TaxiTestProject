@@ -5,6 +5,10 @@
     <string name="route_number">Номер маршрута</string>
     <string name="saving_state">Состояние сохранения</string>
     <string name="saving_date">Дата сохранения</string>
+    <string name="map_item">Карта</string>
+    <string name="list_item">Маршруты</string>
+    <string name="taxi_name">Служба такси</string>
+    <string name="label_text">Треккер перемещений</string>
 
     <string name="title_activity_main">MainActivity</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>

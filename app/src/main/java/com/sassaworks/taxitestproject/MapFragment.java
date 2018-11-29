@@ -1,6 +1,9 @@
 package com.sassaworks.taxitestproject;
 
 import android.arch.lifecycle.LiveData;
+import android.arch.lifecycle.ViewModel;
+import android.arch.lifecycle.ViewModelProvider;
+import android.arch.lifecycle.ViewModelProviders;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -41,6 +44,8 @@ import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.maps.model.RoundCap;
 import com.sassaworks.taxitestproject.database.AppDatabase;
 import com.sassaworks.taxitestproject.database.AppExecutor;
+import com.sassaworks.taxitestproject.database.GetRouteViewModel;
+import com.sassaworks.taxitestproject.database.GetRouteViewModelFactory;
 import com.sassaworks.taxitestproject.database.LocationRoute;
 import com.sassaworks.taxitestproject.service.LocationBackgroundService;
 
@@ -62,6 +67,8 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
     private static final int PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
+    private static double LAT = 48.97;
+    private static double LON = 82.61;
 
     MapView mMap;
     private GoogleMap mGoogleMap;
@@ -119,7 +126,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                 false);
         mMap = v.findViewById(R.id.mapView);
         mMap.onCreate(savedInstanceState);
-
         mMap.onResume();// needed to get the map to display immediately
 
         try {
@@ -128,7 +134,10 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
             e.printStackTrace();
         }
 
-
+        if (savedInstanceState!=null)
+        {
+            mParam1 = savedInstanceState.getString(ARG_PARAM1,"1");
+        }
 
         mDb = AppDatabase.getInstance(getContext());
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getContext());
@@ -139,6 +148,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
             fab.setImageResource(R.drawable.ic_stop);
         }
         fab.setOnClickListener((view) -> {
+                mParam1 = "1";
                 if (!sharedPreferences.getBoolean(getString(R.string.saving_state),false)) {
                     mRouteDate = new Date();
                     mRouteCount = sharedPreferences.getInt(getString(R.string.route_number), 1) + 1;
@@ -159,17 +169,18 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
             public void onReceive(Context context, Intent intent) {
                 double latitude = intent.getDoubleExtra(LocationBackgroundService.LAT_DATA,0);
                 double longitude = intent.getDoubleExtra(LocationBackgroundService.LON_DATA,0);
-                mGoogleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
-                        new LatLng(latitude,
-                                longitude),15));
-                if (mCurrentMarker != null) mCurrentMarker.remove();
-                mCurrentMarker = mGoogleMap.addMarker(new MarkerOptions()
-                        .title("My location")
-                        .position(new LatLng(latitude,
-                                longitude)));
-//                if (trackingMode) {
-//                    saveToDatabase(latitude,longitude);
-//                }
+                LAT = latitude;
+                LON = longitude;
+                if (!mParam1.equals("route")) {
+                    mGoogleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
+                            new LatLng(latitude,
+                                    longitude), 15));
+                    if (mCurrentMarker != null) mCurrentMarker.remove();
+                    mCurrentMarker = mGoogleMap.addMarker(new MarkerOptions()
+                            .title("My location")
+                            .position(new LatLng(latitude,
+                                    longitude)));
+                }
             }
         },new IntentFilter(LocationBackgroundService.ACTION_LOCATION_BROADCAST));
 
@@ -205,13 +216,24 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mGoogleMap = googleMap;
-        mListener.onFragmentInteraction();
-        if (mParam1.equals("route"))
+        mGoogleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(LAT, LON),15));
+        mCurrentMarker = mGoogleMap.addMarker(new MarkerOptions()
+                .title("My location")
+                .position(new LatLng(LAT,
+                        LON)));
+
+        if (mListener != null)
+            mListener.onFragmentInteraction();
+        if (mParam1.equals("route")&&getActivity()!= null)
         {
-            LiveData<List<LocationRoute>> routePoints = mDb.routeDao().loadRouteByName(mParam2);
-            routePoints.observe(this, lr ->{
-                drawSelectedRoute(lr);
+            GetRouteViewModelFactory factory = new GetRouteViewModelFactory(mDb,mParam2);
+            GetRouteViewModel viewModel = ViewModelProviders.of(this,factory)
+                    .get(GetRouteViewModel.class);
+            viewModel.getRoute().observe(this,locationRoutes -> {
+                viewModel.getRoute().removeObserver(this::drawSelectedRoute);
+                drawSelectedRoute(locationRoutes);
             });
+
         }
     }
 
@@ -221,13 +243,17 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         polyOptions.geodesic(true).color(Color.RED).width(5);
         polyOptions.startCap(new RoundCap());
         polyOptions.endCap(new RoundCap());
+        if (lr.size()>0) {
+            mGoogleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
+                    new LatLng(lr.get(0).getLatitude(), lr.get(0).getLongitude()), 15));
+        }
 
         for (LocationRoute item : lr)
         {
             LatLng latLng = new LatLng(item.getLatitude(), item.getLongitude());
             polyOptions.add(latLng);
         }
-        mGoogleMap.addPolyline(polyOptions);
+        mPolyline = mGoogleMap.addPolyline(polyOptions);
     }
 
     /**
@@ -245,12 +271,10 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         void onFragmentInteraction();
     }
 
-    private void saveToDatabase(double latitude, double longitude)
-    {
-        String routeName = "Маршрут " + mRouteCount;
-        final LocationRoute route = new LocationRoute(routeName,latitude,longitude,mRouteDate);
-        AppExecutor.getInstance().getDbExecutor().execute(() -> {
-            mDb.routeDao().insertRoute(route);
-        });
+    @Override
+    public void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString(ARG_PARAM1,mParam1);
     }
+
 }
