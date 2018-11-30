@@ -1,6 +1,7 @@
 package com.sassaworks.taxitestproject;
 
 import android.arch.lifecycle.LiveData;
+import android.arch.lifecycle.Observer;
 import android.arch.lifecycle.ViewModel;
 import android.arch.lifecycle.ViewModelProvider;
 import android.arch.lifecycle.ViewModelProviders;
@@ -17,6 +18,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
@@ -24,12 +26,15 @@ import android.support.v4.content.ContextCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.helper.ItemTouchHelper;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
@@ -42,6 +47,8 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.maps.model.RoundCap;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
 import com.sassaworks.taxitestproject.database.AppDatabase;
 import com.sassaworks.taxitestproject.database.AppExecutor;
 import com.sassaworks.taxitestproject.database.GetRouteViewModel;
@@ -66,14 +73,16 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
+    private static final String TRACK_STATE = "track_state";
+
     private static final int PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
-    private static double LAT = 48.97;
-    private static double LON = 82.61;
+    private static double LAT = 0;
+    private static double LON = 0;
 
     MapView mMap;
     private GoogleMap mGoogleMap;
     private Marker mCurrentMarker = null;
-    private boolean mLocationPermissionGranted;
+    private static boolean mIsTracking = false;
     private Location mLastLocation;
     private LocationRequest mLocationRequest;
     private LocationCallback mLocationCallback;
@@ -81,6 +90,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     private int mRouteCount = 0;
     private Date mRouteDate;
     private Polyline mPolyline;
+    private static Bundle savedState;
 
     // TODO: Rename and change types of parameters
     private String mParam1;
@@ -113,6 +123,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         if (getArguments() != null) {
             mParam1 = getArguments().getString(ARG_PARAM1);
             mParam2 = getArguments().getString(ARG_PARAM2);
@@ -128,28 +139,54 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         mMap.onCreate(savedInstanceState);
         mMap.onResume();// needed to get the map to display immediately
 
-        try {
-            MapsInitializer.initialize(getActivity().getApplicationContext());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+//        try {
+//            MapsInitializer.initialize(getActivity().getApplicationContext());
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
 
         if (savedInstanceState!=null)
         {
-            mParam1 = savedInstanceState.getString(ARG_PARAM1,"1");
+            mParam1 = savedState.getString(ARG_PARAM1,"1");
+            //mIsTracking = savedState.getBoolean(TRACK_STATE,false);
         }
 
         mDb = AppDatabase.getInstance(getContext());
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getContext());
         FloatingActionButton fab = v.findViewById(R.id.startTracking);
-        if (!sharedPreferences.getBoolean(getString(R.string.saving_state), false)) {
-            fab.setImageResource(R.drawable.ic_play);
-        } else {
+        FloatingActionButton removeTrack = v.findViewById(R.id.removeTracks);
+
+//        if (!sharedPreferences.getBoolean(getString(R.string.saving_state), false)) {
+//            fab.setImageResource(R.drawable.ic_play);
+//        } else {
+//            fab.setImageResource(R.drawable.ic_stop);
+//        }
+        if (mIsTracking)
+        {
             fab.setImageResource(R.drawable.ic_stop);
         }
+        else
+        {
+            fab.setImageResource(R.drawable.ic_play);
+        }
+
+
+        removeTrack.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (mPolyline!=null)
+                {
+                    mPolyline.remove();
+                }
+                mParam1 = "1";
+                mListener.onFragmentInteraction();
+            }
+        });
+
         fab.setOnClickListener((view) -> {
                 mParam1 = "1";
                 if (!sharedPreferences.getBoolean(getString(R.string.saving_state),false)) {
+                    mIsTracking = true;
                     mRouteDate = new Date();
                     mRouteCount = sharedPreferences.getInt(getString(R.string.route_number), 1) + 1;
                     sharedPreferences.edit().putInt(getString(R.string.route_number), mRouteCount).apply();
@@ -159,6 +196,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
 
                 }
                 else {
+                    mIsTracking = false;
                     sharedPreferences.edit().putBoolean(getString(R.string.saving_state),false).apply();
                     fab.setImageResource(R.drawable.ic_play);
                 }
@@ -185,7 +223,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         },new IntentFilter(LocationBackgroundService.ACTION_LOCATION_BROADCAST));
 
         mMap.getMapAsync(this);
-        // Inflate the layout for this fragment
+
         return v;
     }
 
@@ -214,6 +252,13 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     }
 
     @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        savedState= new Bundle();
+
+    }
+
+    @Override
     public void onMapReady(GoogleMap googleMap) {
         mGoogleMap = googleMap;
         mGoogleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(LAT, LON),15));
@@ -224,14 +269,20 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
 
         if (mListener != null)
             mListener.onFragmentInteraction();
+
+
+
         if (mParam1.equals("route")&&getActivity()!= null)
         {
             GetRouteViewModelFactory factory = new GetRouteViewModelFactory(mDb,mParam2);
             GetRouteViewModel viewModel = ViewModelProviders.of(this,factory)
                     .get(GetRouteViewModel.class);
-            viewModel.getRoute().observe(this,locationRoutes -> {
-                viewModel.getRoute().removeObserver(this::drawSelectedRoute);
-                drawSelectedRoute(locationRoutes);
+            viewModel.getRoute().observe(this, new Observer<List<LocationRoute>>() {
+                @Override
+                public void onChanged(@Nullable List<LocationRoute> locationRoutes) {
+                    viewModel.getRoute().removeObserver(this);
+                    drawSelectedRoute(locationRoutes);
+                }
             });
 
         }
@@ -275,6 +326,11 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putString(ARG_PARAM1,mParam1);
+    }
+
+    @Override
+    public void onViewStateRestored(@Nullable Bundle savedInstanceState) {
+        super.onViewStateRestored(savedInstanceState);
     }
 
 }

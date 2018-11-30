@@ -26,9 +26,6 @@ import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.maps.CameraUpdateFactory;
-import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MarkerOptions;
 import com.sassaworks.taxitestproject.R;
 import com.sassaworks.taxitestproject.broadcast.TrackReceiver;
 import com.sassaworks.taxitestproject.database.AppDatabase;
@@ -52,7 +49,6 @@ GoogleApiClient.OnConnectionFailedListener{
 
     SharedPreferences sharedPreferences;
     AppDatabase mDb;
-    public static final String ACTION_PING = LocationBackgroundService.class.getName() + ".PING";
 
     public LocationBackgroundService() {
     }
@@ -73,7 +69,7 @@ GoogleApiClient.OnConnectionFailedListener{
         super.onCreate();
         sInstance = this;
 
-        //Creating foreground service for saving coords when in background
+        //Создаем foreground сервис чтобы сохранял координаты если приложение закрыто
         Notification notification =
                 null;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -89,14 +85,14 @@ GoogleApiClient.OnConnectionFailedListener{
             notification = new Notification.Builder(this,NOTIFICATION_CHANNEL_ID )
                     .setContentTitle("Taxi")
                     .setContentText("Taxi")
-                    .setSmallIcon(R.drawable.googleg_standard_color_18)
+                    .setSmallIcon(R.drawable.map_black)
                     .setTicker("ticker")
                     .build();
         } else {
 
             NotificationCompat.Builder builder = new NotificationCompat.Builder(this)
                     .setContentTitle(getString(R.string.app_name))
-                    .setSmallIcon(R.drawable.googleg_standard_color_18)
+                    .setSmallIcon(R.drawable.map_black)
                     .setContentText("Taxi")
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     .setAutoCancel(true);
@@ -146,11 +142,11 @@ GoogleApiClient.OnConnectionFailedListener{
 
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
+
         mLocationRequest = new LocationRequest();
         mLocationRequest.setInterval(10000);
         mLocationRequest.setFastestInterval(5000);
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        //startLocationUpdates();
 
         mLocationClient.connect();
 
@@ -161,9 +157,6 @@ GoogleApiClient.OnConnectionFailedListener{
     private void startLocationUpdates() {
 
         try {
-
-            Intent intent = new Intent(this,TrackReceiver.class);
-            PendingIntent pendingIntent = PendingIntent.getBroadcast(this,15,intent,PendingIntent.FLAG_UPDATE_CURRENT);
             mFusedLocationClient.requestLocationUpdates(mLocationRequest,
                     mLocationCallback,
                     null /* Looper */);

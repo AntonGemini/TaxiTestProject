@@ -2,24 +2,36 @@ package com.sassaworks.taxitestproject;
 
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.location.Location;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.FragmentTransaction;
 import android.support.v4.content.ContextCompat;
 import android.support.design.widget.NavigationView;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
 import com.sassaworks.taxitestproject.database.AppDatabase;
 import com.sassaworks.taxitestproject.database.AppExecutor;
 import com.sassaworks.taxitestproject.database.LocationRouteDao;
 import com.sassaworks.taxitestproject.service.LocationBackgroundService;
+
+import static com.sassaworks.taxitestproject.service.LocationBackgroundService.ACTION_LOCATION_BROADCAST;
+import static com.sassaworks.taxitestproject.service.LocationBackgroundService.LAT_DATA;
+import static com.sassaworks.taxitestproject.service.LocationBackgroundService.LON_DATA;
 
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener,
@@ -63,7 +75,8 @@ public class MainActivity extends AppCompatActivity
 
         if (savedInstanceState==null) {
             getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.content_frame, MapFragment.newInstance("1", "2")).commit();
+                    .replace(R.id.content_frame, MapFragment.newInstance("1", "2"),MapFragment.class.getSimpleName())
+                    .commit();
         }
     }
 
@@ -106,13 +119,16 @@ public class MainActivity extends AppCompatActivity
         int id = item.getItemId();
 
         if (id == R.id.nav_camera) {
-            getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.content_frame,MapFragment.newInstance("1","2")).commit();
+            FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
+                    transaction.replace(R.id.content_frame,MapFragment.newInstance("1","2"),MapFragment.class.getSimpleName());
+                    transaction.commit();
+
 
             // Handle the camera action
         } else if (id == R.id.nav_gallery) {
-            getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.content_frame,LocationRouteFragment.newInstance(1)).commit();
+            FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
+                    transaction.replace(R.id.content_frame,LocationRouteFragment.newInstance(1),LocationRouteFragment.class.getSimpleName());
+                    transaction.commit();
 
         }
 
@@ -124,14 +140,6 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onFragmentInteraction() {
         getLocationPermission();
-        if (!LocationBackgroundService.isServiceRun()) {
-            Intent intent = new Intent(this, LocationBackgroundService.class);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent);
-            } else {
-                startService(intent);
-            }
-        }
     }
 
     private void getLocationPermission() {
@@ -143,6 +151,15 @@ public class MainActivity extends AppCompatActivity
         if (ContextCompat.checkSelfPermission(this.getApplicationContext(),
                 android.Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED) {
+            if (!LocationBackgroundService.isServiceRun()) {
+                Intent intent = new Intent(this, LocationBackgroundService.class);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(intent);
+                } else {
+                    startService(intent);
+                }
+            }
+            getCurrentLocation();
             mLocationPermissionGranted = true;
         } else {
             ActivityCompat.requestPermissions(this,
@@ -173,8 +190,31 @@ public class MainActivity extends AppCompatActivity
                 startService(intent);
             }
         }
-        //Intent intent = new Intent(this, LocationBackgroundService.class);
-        //startService(intent);
+
+        getCurrentLocation();
+    }
+
+    private void getCurrentLocation() {
+        try {
+            FusedLocationProviderClient mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+            Task<Location> locationResult = mFusedLocationClient.getLastLocation();
+
+            locationResult.addOnCompleteListener( new OnCompleteListener<Location>() {
+                @Override
+                public void onComplete(@NonNull Task<Location> task) {
+                    if (task.isSuccessful()) {
+                        // Set the map's camera position to the current location of the device.
+                        Location mLastKnownLocation = task.getResult();
+                        Intent intent = new Intent(ACTION_LOCATION_BROADCAST);
+                        intent.putExtra(LAT_DATA, mLastKnownLocation.getLatitude());
+                        intent.putExtra(LON_DATA, mLastKnownLocation.getLongitude());
+                        LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(intent);
+                    }
+                }
+            });
+        } catch (SecurityException e)  {
+            Log.e("Exception: %s", e.getMessage());
+        }
     }
 
 
