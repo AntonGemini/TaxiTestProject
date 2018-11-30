@@ -73,9 +73,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
-    private static final String TRACK_STATE = "track_state";
 
-    private static final int PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
     private static double LAT = 0;
     private static double LON = 0;
 
@@ -83,9 +81,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     private GoogleMap mGoogleMap;
     private Marker mCurrentMarker = null;
     private static boolean mIsTracking = false;
-    private Location mLastLocation;
-    private LocationRequest mLocationRequest;
-    private LocationCallback mLocationCallback;
     private AppDatabase mDb;
     private int mRouteCount = 0;
     private Date mRouteDate;
@@ -137,18 +132,12 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                 false);
         mMap = v.findViewById(R.id.mapView);
         mMap.onCreate(savedInstanceState);
-        mMap.onResume();// needed to get the map to display immediately
+        mMap.onResume();// needed to get the map to immediately
 
-//        try {
-//            MapsInitializer.initialize(getActivity().getApplicationContext());
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
 
         if (savedInstanceState!=null)
         {
             mParam1 = savedState.getString(ARG_PARAM1,"1");
-            //mIsTracking = savedState.getBoolean(TRACK_STATE,false);
         }
 
         mDb = AppDatabase.getInstance(getContext());
@@ -227,12 +216,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         return v;
     }
 
-    // TODO: Rename method, update argument and hook method into UI event
-    public void onButtonPressed(Uri uri) {
-        if (mListener != null) {
-            mListener.onFragmentInteraction();
-        }
-    }
 
     @Override
     public void onAttach(Context context) {

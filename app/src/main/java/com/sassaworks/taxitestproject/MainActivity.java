@@ -53,14 +53,6 @@ public class MainActivity extends AppCompatActivity
         setSupportActionBar(toolbar);
         mDb = AppDatabase.getInstance(this);
 
-//        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-//        fab.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View view) {
-//                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-//                        .setAction("Action", null).show();
-//            }
-//        });
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
 
@@ -69,7 +61,7 @@ public class MainActivity extends AppCompatActivity
         drawer.addDrawerListener(toggle);
         toggle.syncState();
 
-        navigationView = (NavigationView) findViewById(R.id.nav_view);
+        navigationView = findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
 
@@ -143,11 +135,7 @@ public class MainActivity extends AppCompatActivity
     }
 
     private void getLocationPermission() {
-        /*
-         * Request location permission, so that we can get the location of the
-         * device. The result of the permission request is handled by a callback,
-         * onRequestPermissionsResult.
-         */
+
         if (ContextCompat.checkSelfPermission(this.getApplicationContext(),
                 android.Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED) {
@@ -175,7 +163,7 @@ public class MainActivity extends AppCompatActivity
         mLocationPermissionGranted = false;
         switch (requestCode) {
             case PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION: {
-                // If request is cancelled, the result arrays are empty.
+
                 if (grantResults.length > 0
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     mLocationPermissionGranted = true;
@@ -203,7 +191,7 @@ public class MainActivity extends AppCompatActivity
                 @Override
                 public void onComplete(@NonNull Task<Location> task) {
                     if (task.isSuccessful()) {
-                        // Set the map's camera position to the current location of the device.
+
                         Location mLastKnownLocation = task.getResult();
                         Intent intent = new Intent(ACTION_LOCATION_BROADCAST);
                         intent.putExtra(LAT_DATA, mLastKnownLocation.getLatitude());

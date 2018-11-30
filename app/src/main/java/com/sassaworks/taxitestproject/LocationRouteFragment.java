@@ -1,11 +1,9 @@
 package com.sassaworks.taxitestproject;
 
 import android.arch.lifecycle.LiveData;
-import android.arch.lifecycle.Observer;
 import android.content.Context;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.DividerItemDecoration;
 import android.support.v7.widget.GridLayoutManager;
@@ -18,7 +16,6 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import com.sassaworks.taxitestproject.database.AppDatabase;
-import com.sassaworks.taxitestproject.database.LocationRoute;
 import com.sassaworks.taxitestproject.database.LocationRouteDao;
 
 import java.util.List;
@@ -87,17 +84,9 @@ public class LocationRouteFragment extends Fragment {
 
             LiveData<List<LocationRouteDao.TempLocal>> routes = mDb.routeDao().loadGroupedRoutes();
             routes.observe(getActivity(), r -> {
-                List<LocationRouteDao.TempLocal> tl = r;
-                tl.size();
                 recyclerView.setAdapter(new MyLocationRouteRecyclerViewAdapter(r,mListener));
             });
-//            mDb.routeDao().loadGroupedRoutes().subscribe(s->{
-//                List<LocationRouteDao.TempLocal> tl = s;
-//                tl.size();
-//                recyclerView.setAdapter(new MyLocationRouteRecyclerViewAdapter(s,mListener));
-//                }
-//            );
-            //recyclerView.setAdapter(new MyLocationRouteRecyclerViewAdapter(DummyContent.ITEMS, mListener));
+
             new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0,ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
                 @Override
                 public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder viewHolder1) {
